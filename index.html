@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sterling Creek Bid Tracker | Home Vision Studio</title>
+<style>
+  :root {
+    --navy: #14213d;
+    --navy-light: #1f3357;
+    --gold: #c9a24b;
+    --gold-light: #e8d8ae;
+    --gold-bg: #fdf6e6;
+    --green: #1e7a4c;
+    --green-bg: #eaf6ef;
+    --red: #b83232;
+    --gray-bg: #f5f6f8;
+    --border: #dfe3e8;
+    --text: #1c2024;
+    --text-muted: #4b525a;
+    --text-dim: #767d86;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--gray-bg);
+    color: var(--text);
+  }
+  header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+    color: white;
+    padding: 22px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header .title-block h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.2px; }
+  header .title-block .sub { margin-top: 2px; font-size: 13px; color: var(--gold-light); }
+  .badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px; flex-wrap: wrap; gap: 10px;
+  }
+  .toolbar .status { font-size: 12.5px; color: var(--text-muted); }
+  .toolbar .status.saving { color: #8a6d1f; }
+  .toolbar .status.error { color: var(--red); }
+  button.primary {
+    background: var(--navy); color: white; border: none;
+    padding: 9px 16px; border-radius: 6px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { background: var(--navy-light); }
+  button.primary:disabled { opacity: 0.5; cursor: default; }
+  .table-wrap {
+    margin: 0 32px 40px; background: white; border-radius: 10px;
+    border: 1px solid var(--border); overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 1120px; font-size: 13.5px; }
+  thead th {
+    position: sticky; top: 0; background: var(--navy); color: white; text-align: left;
+    padding: 12px 14px; font-weight: 600; font-size: 12.5px; text-transform: uppercase;
+    letter-spacing: 0.4px; white-space: nowrap; z-index: 2;
+  }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:hover { background: #fafbfc; }
+  .editable { min-width: 90px; outline: none; border-radius: 4px; padding: 4px 6px; cursor: text; }
+  .editable:hover { background: #f1f3f6; }
+  .editable:focus { background: #fffbea; box-shadow: 0 0 0 2px var(--gold); }
+  .locked { color: var(--text-muted); cursor: not-allowed; }
+  .trade-cell { min-width: 175px; }
+  .trade-amount { font-weight: 600; }
+  /* A trade partner is not sent other trades' pricing, so those cells
+     arrive empty. Say so rather than showing a blank the user reads as
+     "nobody has bid this yet". */
+  .amount-hidden { color: var(--text-dim); font-weight: 400; font-style: italic; font-size: 12.5px; padding: 4px 6px; }
+  .trade-check-row { display: flex; align-items: center; gap: 7px; margin-top: 5px; font-size: 12.5px; color: #363c44; font-weight: 500; }
+  /* Read-only rows are still dark enough to read at a glance. */
+  .trade-check-row.locked-row { color: #5a626c; }
+  .trade-check-row.approve-row { font-weight: 600; }
+  .trade-check-row.approve-row.checked { color: var(--green); }
+
+  /* Browsers render a disabled checkbox almost invisibly, which made the
+     builder's view look washed out. These are drawn by hand so a tick reads
+     clearly whether or not the person can change it. */
+  .trade-check-row input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 15px; height: 15px; margin: 0; flex-shrink: 0;
+    border: 1.5px solid #98a1ac; border-radius: 3px; background: #fff;
+    position: relative; cursor: pointer;
+  }
+  .trade-check-row input[type="checkbox"]:checked {
+    background: var(--navy); border-color: var(--navy);
+  }
+  .trade-check-row input[type="checkbox"]:checked::after {
+    content: ''; position: absolute; left: 4px; top: 1px;
+    width: 4px; height: 8px;
+    border: solid #fff; border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg);
+  }
+  /* Not editable by you — full strength, just a slate fill instead of navy. */
+  .trade-check-row input[type="checkbox"]:disabled { cursor: default; opacity: 1; border-color: #aab2bc; }
+  .trade-check-row input[type="checkbox"]:disabled:checked {
+    background: #55606e; border-color: #55606e;
+  }
+  /* Approved reads green when ticked, in either state. */
+  .trade-check-row.approve-row input[type="checkbox"]:checked { background: var(--green); border-color: var(--green); }
+  .trade-check-row.approve-row input[type="checkbox"]:disabled:checked { background: #3f7a5c; border-color: #3f7a5c; }
+
+  /* The signature behind an approval. This is the answer to "who approved
+     it and against which document" — so it sits on the row, not buried in
+     a panel someone has to think to open. */
+  .sig {
+    margin-top: 4px; padding: 5px 7px;
+    background: var(--green-bg); border: 1px solid #cfe6d9; border-left: 3px solid var(--green);
+    border-radius: 4px; font-size: 11.5px; line-height: 1.4; color: #235c41;
+  }
+  .sig .who { font-weight: 700; }
+  .sig a { color: #1a5c3c; font-weight: 600; text-decoration: none; display: block; margin-top: 2px;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sig a:hover { text-decoration: underline; }
+  .sig .unsigned { color: #8a6d1f; }
+
+  .chat-btn {
+    margin-top: 8px; width: 100%;
+    background: #eef0f4; border: 1px solid #ccd2da; color: #2f353c;
+    padding: 5px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; text-align: left; font-family: inherit;
+  }
+  .chat-btn:hover { background: #e2e6ec; }
+  /* Read, or only your own messages — stays plain. */
+  .chat-btn.has { }
+  /* Gold ONLY when the other side has said something you haven't read. */
+  .chat-btn.unread {
+    background: #f7e3b4; border-color: var(--gold); color: #5c460b;
+    font-weight: 700; box-shadow: inset 3px 0 0 var(--gold);
+  }
+  .chat-btn.unread:hover { background: #f3dca4; }
+
+  .project-cell { min-width: 160px; font-weight: 600; }
+  .docs-btn {
+    background: #eef0f4; border: 1px solid #ccd2da; color: #2f353c;
+    padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .docs-btn:hover { background: #e2e6ec; }
+  .docs-btn.hasdocs { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .docs-btn.hasdocs:hover { background: var(--navy-light); }
+  .doc-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: white; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px;
+  }
+  .doc-main { min-width: 0; }
+  .doc-name {
+    font-size: 13.5px; font-weight: 600; color: var(--navy); text-decoration: none;
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .doc-name:hover { text-decoration: underline; }
+  .doc-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .doc-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 11.5px; font-weight: 600; flex-shrink: 0; }
+  .doc-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .doc-rot { background: none; border: none; color: var(--navy); cursor: pointer; font-size: 11.5px; font-weight: 600; }
+  .doc-rot:hover { text-decoration: underline; }
+  .doc-rotbar {
+    margin-top: 8px; background: var(--gold-bg); border: 1px solid var(--gold-light);
+    border-radius: 6px; padding: 8px 10px; display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; font-size: 12px;
+  }
+  .doc-rotbar .msg { color: #7a5f14; font-weight: 600; }
+  .doc-rotbar .btns { display: flex; align-items: center; gap: 6px; }
+  .doc-rotbar button { font-family: inherit; cursor: pointer; border-radius: 5px; font-size: 12px; font-weight: 700; padding: 4px 9px; }
+  .doc-rotbar .turn { background: #fff; border: 1px solid var(--gold); color: #7a5f14; }
+  .doc-rotbar .save { background: var(--navy); border: none; color: #fff; }
+  .doc-rotbar .cancel { background: none; border: none; color: var(--text-muted); font-weight: 600; }
+  .doc-rotbar button:disabled { opacity: 0.5; cursor: default; }
+  .up-note { font-size: 11.5px; color: var(--text-muted); }
+  .del-btn { background: none; border: none; color: var(--red); cursor: pointer; font-size: 12px; padding: 4px 6px; }
+  footer { text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px; }
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted); }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,33,61,0.45);
+    display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .overlay.open { display: flex; }
+  .chat-panel {
+    background: white; width: 100%; max-width: 560px; max-height: 85vh;
+    border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+  .chat-head {
+    background: var(--navy); color: white; padding: 16px 20px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  }
+  .chat-head .ct { font-size: 15px; font-weight: 600; }
+  .chat-head .cs { font-size: 12.5px; color: var(--gold-light); margin-top: 2px; }
+  .chat-close {
+    background: rgba(255,255,255,0.15); border: none; color: white; cursor: pointer;
+    width: 28px; height: 28px; border-radius: 6px; font-size: 16px; line-height: 1; flex-shrink: 0;
+  }
+  .chat-close:hover { background: rgba(255,255,255,0.28); }
+  .chat-body { padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 160px; background: #fbfcfd; }
+  .msg { margin-bottom: 16px; }
+  .msg-meta { font-size: 11.5px; color: var(--text-muted); margin-bottom: 3px; }
+  .msg-meta .who { font-weight: 700; color: var(--navy); }
+  .msg-meta .role { color: #9a7a24; font-weight: 600; }
+  .msg-text {
+    background: white; border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 12px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word;
+  }
+  .msg.mine .msg-text { background: var(--gold-bg); border-color: var(--gold-light); }
+  .msg-file {
+    display: inline-flex; align-items: center; gap: 7px; margin-top: 6px;
+    background: white; border: 1px solid #ccd2da; border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; font-weight: 600; color: var(--navy);
+    text-decoration: none; max-width: 100%;
+  }
+  .msg-file:hover { background: #eef0f4; border-color: var(--navy); }
+  .msg-file .fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 30px 10px; font-style: italic; }
+  .chat-foot { border-top: 1px solid var(--border); padding: 12px 16px; background: white; }
+  .chat-foot textarea {
+    width: 100%; border: 1px solid #ccd2da; border-radius: 8px; padding: 9px 11px;
+    font-family: inherit; font-size: 13.5px; resize: vertical; min-height: 62px; outline: none; color: var(--text);
+  }
+  .chat-foot textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,162,75,0.2); }
+  .chat-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; gap: 10px; }
+  .chat-as { font-size: 11.5px; color: var(--text-muted); }
+  .chat-as a { color: var(--navy); cursor: pointer; text-decoration: underline; }
+  .chat-right { display: flex; align-items: center; gap: 8px; }
+  .attach-btn {
+    display: inline-block; background: #eef0f4; border: 1px solid #ccd2da; color: #2f353c;
+    padding: 8px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .attach-btn:hover { background: #e2e6ec; }
+  .chat-attached {
+    margin-top: 8px; font-size: 12px; color: var(--navy); background: var(--gold-bg);
+    border: 1px solid var(--gold-light); border-radius: 6px; padding: 7px 10px;
+    display: none; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .chat-attached.show { display: flex; }
+  .chat-attached .rm { color: var(--red); cursor: pointer; font-weight: 700; }
+  .rot-tools { display: flex; align-items: center; gap: 6px; }
+  .rot-btn {
+    background: #fff; border: 1px solid var(--gold); color: #7a5f14;
+    border-radius: 5px; padding: 3px 8px; font-size: 12px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .rot-btn:hover { background: #fbeecb; }
+  .rot-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* ---- approve panel ---- */
+  .ap-intro { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5; }
+  .ap-amount {
+    background: var(--gold-bg); border: 1px solid var(--gold-light); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 16px; font-size: 13px; color: #6b5210;
+  }
+  .ap-amount strong { font-size: 17px; color: var(--navy); display: block; margin-top: 2px; }
+  .ap-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+              color: var(--text-muted); margin: 0 0 7px; }
+  .ap-doc {
+    display: flex; align-items: flex-start; gap: 10px; background: white;
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    margin-bottom: 7px; cursor: pointer;
+  }
+  .ap-doc:hover { border-color: var(--gold); background: #fffdf7; }
+  .ap-doc.sel { border-color: var(--green); background: var(--green-bg); box-shadow: inset 3px 0 0 var(--green); }
+  .ap-doc input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--green); }
+  .ap-doc .n { font-size: 13px; font-weight: 600; color: var(--navy); word-break: break-word; }
+  .ap-doc .m { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .ap-doc .v { font-size: 11.5px; color: var(--navy); font-weight: 600; text-decoration: underline; margin-top: 3px; display: inline-block; }
+  .ap-name, .ap-note {
+    width: 100%; border: 1px solid #ccd2da; border-radius: 8px; padding: 9px 11px;
+    font-family: inherit; font-size: 13.5px; outline: none; color: var(--text);
+  }
+  .ap-name:focus, .ap-note:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,162,75,0.2); }
+  .ap-note { resize: vertical; min-height: 60px; }
+  .ap-warn {
+    background: #fdf0ef; border: 1px solid #f0cdc8; border-left: 3px solid var(--red);
+    border-radius: 6px; padding: 10px 12px; font-size: 12.5px; color: #7d2419; line-height: 1.5;
+  }
+  button.approve-go { background: var(--green); }
+  button.approve-go:hover { background: #19613c; }
+  button.revoke-go { background: var(--red); }
+  button.revoke-go:hover { background: #9a2828; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <h1>Sterling Creek — Bid Tracker</h1>
+    <div class="sub">Home Vision Studio · Flooring &amp; Tile · Cabinets · Countertops · Lights</div>
+  </div>
+  <div class="badge" id="roleBadge">Loading…</div>
+</header>
+
+<div class="toolbar">
+  <div><button class="primary" id="addProjectBtn" style="display:none;">+ Add Project</button></div>
+  <div class="status" id="statusText">Connecting…</div>
+</div>
+
+<div class="table-wrap">
+  <table id="bidTable">
+    <thead>
+      <tr>
+        <th>Project</th>
+        <th>Address</th>
+        <th>Released</th>
+        <th>Due Date</th>
+        <th>Documents</th>
+        <th>Flooring &amp; Tile</th>
+        <th>Cabinets</th>
+        <th>Countertops</th>
+        <th>Lights</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="bidTableBody"></tbody>
+  </table>
+  <div id="emptyState" class="empty-state" style="display:none;">
+    No projects yet. Admin can add the first one with "+ Add Project".
+  </div>
+</div>
+
+<div class="overlay" id="chatOverlay">
+  <div class="chat-panel">
+    <div class="chat-head">
+      <div>
+        <div class="ct" id="chatTitle">Conversation</div>
+        <div class="cs" id="chatSub"></div>
+      </div>
+      <button class="chat-close" id="chatClose" title="Close">&times;</button>
+    </div>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="chat-foot" id="chatFoot"></div>
+  </div>
+</div>
+
+<footer>Sterling Creek Bid Tracker · Live via Google Sheets · Home Vision Studio</footer>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZGuA9h_SaPatj6yU1zlP1kVsp20B6Q7VAK1lUG8tfTzcpsqQPTCt1clwh26l2Zl3H/exec";
+const MAX_FILE_MB = 25;
+
+const TRADES = {
+  flooring:    { label: 'Flooring & Tile', amountField: 'Flooring',    prelimField: 'FlooringPrelim',    finalField: 'FlooringFinal',    approvedField: 'FlooringApproved' },
+  cabinets:    { label: 'Cabinets',        amountField: 'Cabinets',    prelimField: 'CabinetsPrelim',    finalField: 'CabinetsFinal',    approvedField: 'CabinetsApproved' },
+  countertops: { label: 'Countertops',     amountField: 'Countertops', prelimField: 'CountertopsPrelim', finalField: 'CountertopsFinal', approvedField: 'CountertopsApproved' },
+  lights:      { label: 'Lights',          amountField: 'Lights',      prelimField: 'LightsPrelim',      finalField: 'LightsFinal',      approvedField: 'LightsApproved' }
+};
+
+const params = new URLSearchParams(window.location.search);
+const keyParam = params.get('key') || '';
+const tradeParam = (params.get('trade') || '').toLowerCase();
+
+// The server decides which trade you are and hands it back — from your key
+// if you have one, otherwise from the ?trade= above. Never assume the URL:
+// always render from what came back.
+let currentTrade = null;
+let builderName = 'the builder';
+
+let isAdmin = false;
+let isApprover = false;
+let rows = [];
+let messages = [];
+let documents = [];
+let approvals = [];
+let openThread = null;
+let openDocs = null;      // project ID whose document panel is open
+let openApprove = null;   // { id, trade, revoking }
+let docRotate = null;     // in-progress rotation of an already-stored document
+let pendingFile = null;   // { name, mime, data }
+let pollTimer = null;
+
+/* ---------- utilities ---------- */
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function setStatus(text, cls) {
+  const el = document.getElementById('statusText');
+  el.textContent = text;
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+function setRoleBadge() {
+  const el = document.getElementById('roleBadge');
+  if (isAdmin) el.textContent = 'Admin View';
+  else if (isApprover) el.textContent = builderName + ' — Approver';
+  else if (currentTrade) el.textContent = TRADES[currentTrade].label + ' — Edit Access';
+  else el.textContent = 'Read Only';
+}
+
+function myName() { try { return localStorage.getItem('hvsChatName') || ''; } catch (e) { return ''; } }
+function setMyName(n) { try { localStorage.setItem('hvsChatName', n); } catch (e) {} }
+
+function seenKey(rowId, trade) { return 'hvsSeen:' + rowId + ':' + trade; }
+function lastSeen(rowId, trade) { try { return localStorage.getItem(seenKey(rowId, trade)) || ''; } catch (e) { return ''; } }
+function markSeen(rowId, trade) {
+  const list = threadMessages(rowId, trade);
+  if (!list.length) return;
+  try { localStorage.setItem(seenKey(rowId, trade), list[list.length - 1].ts); } catch (e) {}
+}
+function threadMessages(rowId, trade) {
+  return messages
+    .filter(m => m.rowId === String(rowId) && m.trade === trade)
+    .sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+}
+// Your own messages never count as unread to you — whatever happened with the
+// seen-marker. Only somebody else's message can light the button up.
+function unreadCount(rowId, trade) {
+  const seen = lastSeen(rowId, trade);
+  const me = myName();
+  return threadMessages(rowId, trade)
+    .filter(m => m.ts > seen && !(me && m.author === me))
+    .length;
+}
+function signatureFor(rowId, trade) {
+  return approvals.find(a => a.rowId === String(rowId) && a.trade === trade) || null;
+}
+
+/* ---------- permissions ---------- */
+function canEditAmount(field) {
+  if (isAdmin) return true;
+  if (currentTrade) {
+    const t = TRADES[currentTrade];
+    return field === t.amountField || field === t.prelimField || field === t.finalField;
+  }
+  return false;
+}
+// Only the builder approves. The studio used to be able to tick this box
+// on their behalf, which made the record worth nothing in a dispute.
+function canApprove() { return isApprover; }
+function canSeeThread(trade) {
+  if (isAdmin || isApprover) return true;
+  return currentTrade === trade;
+}
+// Everyone with a real link can attach and upload. Trades were locked out
+// before, so a cabinet diagram had to go by email — which is exactly how
+// the tracker stops being the single place to look.
+function canAttach() { return isAdmin || isApprover || !!currentTrade; }
+// Anyone holding a real link sees documents; the bare read-only link does not.
+function canSeeDocs() { return isAdmin || isApprover || !!currentTrade; }
+function canUploadDocs() { return isAdmin || isApprover || !!currentTrade; }
+// You can rotate or remove a document only if you put it there. Keeps one
+// trade from touching another's files, or HVS's plan sets.
+function myRoleLabel() {
+  if (isAdmin) return 'Home Vision Studio';
+  if (isApprover) return builderName;
+  if (currentTrade) return TRADES[currentTrade].label;
+  return '';
+}
+function canManageDoc(d) {
+  if (isAdmin || isApprover) return true;
+  return !!currentTrade && d.role === myRoleLabel();
+}
+
+/* ---------- API ---------- */
+async function apiGet() {
+  // The cache buster + no-store matter: without them the browser happily serves
+  // a stale copy of this response and newly posted messages or documents never
+  // show up, even after a full page reload.
+  const url = APPS_SCRIPT_URL + '?key=' + encodeURIComponent(keyParam) +
+              '&trade=' + encodeURIComponent(tradeParam) +
+              '&_=' + Date.now();
+  const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Failed to load');
+  isAdmin = data.role === 'admin';
+  isApprover = data.role === 'approver';
+  currentTrade = TRADES[data.trade] ? data.trade : null;
+  builderName = data.builder || builderName;
+  messages = data.messages || [];
+  documents = data.documents || [];
+  approvals = data.approvals || [];
+  return data.rows;
+}
+// Google runs one script execution at a time per account, so a background
+// refresh firing mid-upload queues behind it and drags a large file out for
+// minutes. Hold the refresh while a big transfer is running.
+function pausePolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+function resumePolling() { if (!pollTimer) pollTimer = setInterval(loadData, 15000); }
+
+async function apiPost(body) {
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Save failed');
+  return data;
+}
+
+// Used for anything carrying a file. A true percentage isn't available here —
+// XMLHttpRequest reports upload progress but breaks on the redirect Google
+// serves from the script URL, so we use fetch and report elapsed time instead.
+// The point is the same: show the user it's alive.
+function apiUpload(body, onTick) {
+  let secs = 0;
+  const ticker = setInterval(function () { secs++; if (onTick) onTick(secs); }, 1000);
+  if (onTick) onTick(0);
+  return apiPost(body).finally(function () { clearInterval(ticker); });
+}
+
+/* ---------- rendering ---------- */
+function isChecked(row, field) { return row[field] === true || row[field] === 'TRUE'; }
+
+function sigHTML(row, tradeKey) {
+  const approved = isChecked(row, TRADES[tradeKey].approvedField);
+  if (!approved) return '';
+  const sig = signatureFor(row.ID, tradeKey);
+  if (!sig) {
+    // Ticked before signed approvals existed, or written straight into the
+    // sheet. Flag it rather than letting it pass as a real sign-off.
+    return '<div class="sig"><span class="unsigned">Approved, but no signature on record. ' +
+           'Ask ' + esc(builderName) + ' to re-approve against a document.</span></div>';
+  }
+  let html = '<div class="sig"><span class="who">' + esc(sig.by) + '</span> · ' + esc(sig.tsLabel);
+  if (sig.amount) html += ' · at ' + esc(sig.amount);
+  if (sig.docUrl) {
+    html += '<a href="' + esc(sig.docUrl) + '" target="_blank" rel="noopener">&#128196; ' + esc(sig.docName) + '</a>';
+  }
+  return html + '</div>';
+}
+
+function tradeCellHTML(row, tradeKey) {
+  const t = TRADES[tradeKey];
+  const amountEditable = canEditAmount(t.amountField);
+  const approveEditable = canApprove();
+  const amount = row[t.amountField] || '';
+  const prelim = isChecked(row, t.prelimField);
+  const final = isChecked(row, t.finalField);
+  const approved = isChecked(row, t.approvedField);
+
+  // A trade partner gets no dollar figure for the other trades, so don't
+  // render an empty editable box that looks like an un-bid job.
+  let amountHTML;
+  if (!amount && currentTrade && currentTrade !== tradeKey) {
+    amountHTML = '<div class="amount-hidden">Not shared</div>';
+  } else {
+    const cls = 'trade-amount editable' + (amountEditable ? '' : ' locked');
+    const attrs = amountEditable
+      ? 'contenteditable="true" data-id="' + esc(row.ID) + '" data-field="' + t.amountField + '"'
+      : '';
+    amountHTML = '<div class="' + cls + '" ' + attrs + '>' + esc(amount) + '</div>';
+  }
+
+  let chat = '';
+  if (canSeeThread(tradeKey)) {
+    const total = threadMessages(row.ID, tradeKey).length;
+    const unread = unreadCount(row.ID, tradeKey);
+    let label, state;
+    if (unread > 0) { label = '● Chat · ' + unread + ' new'; state = ' unread'; }
+    else if (total > 0) { label = 'Chat · ' + total; state = ' has'; }
+    else { label = 'Chat'; state = ''; }
+    chat = '<button class="chat-btn' + state + '" data-role="chat" data-id="' +
+           esc(row.ID) + '" data-trade="' + tradeKey + '">' + label + '</button>';
+  }
+
+  return amountHTML +
+    '<label class="trade-check-row' + (amountEditable ? '' : ' locked-row') + '">' +
+      '<input type="checkbox" data-id="' + esc(row.ID) + '" data-field="' + t.prelimField + '" ' +
+      (prelim ? 'checked' : '') + ' ' + (amountEditable ? '' : 'disabled') + ' /> Prelim Bid</label>' +
+    '<label class="trade-check-row' + (amountEditable ? '' : ' locked-row') + '">' +
+      '<input type="checkbox" data-id="' + esc(row.ID) + '" data-field="' + t.finalField + '" ' +
+      (final ? 'checked' : '') + ' ' + (amountEditable ? '' : 'disabled') + ' /> Final Bid</label>' +
+    '<label class="trade-check-row approve-row' + (approved ? ' checked' : '') + (approveEditable ? '' : ' locked-row') + '">' +
+      '<input type="checkbox" data-role="approve" data-id="' + esc(row.ID) + '" data-trade="' + tradeKey + '" ' +
+      (approved ? 'checked' : '') + ' ' + (approveEditable ? '' : 'disabled') + ' /> Approved</label>' +
+    sigHTML(row, tradeKey) +
+    chat;
+}
+
+function projectDocs(rowId) {
+  return documents
+    .filter(d => d.rowId === String(rowId))
+    .sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0)); // newest first
+}
+
+function docsCellHTML(row) {
+  if (!canSeeDocs()) return '';
+  const n = projectDocs(row.ID).length;
+  return '<button class="docs-btn' + (n ? ' hasdocs' : '') + '" data-role="docs" data-id="' +
+         esc(row.ID) + '">' + (n ? 'Documents · ' + n : 'Documents') + '</button>';
+}
+
+function renderRows() {
+  const tbody = document.getElementById('bidTableBody');
+  const empty = document.getElementById('emptyState');
+  tbody.innerHTML = '';
+  if (!rows.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    const ed = function (field, extraCls) {
+      return '<div class="' + (extraCls ? extraCls + ' ' : '') + 'editable ' + (isAdmin ? '' : 'locked') + '" ' +
+        (isAdmin ? 'contenteditable="true" data-id="' + esc(row.ID) + '" data-field="' + field + '"' : '') +
+        '>' + esc(row[field] || '') + '</div>';
+    };
+    tr.innerHTML =
+      '<td class="project-cell">' + ed('Project') + '</td>' +
+      '<td>' + ed('Address') + '</td>' +
+      '<td>' + ed('Released') + '</td>' +
+      '<td>' + ed('DueDate') + '</td>' +
+      '<td>' + docsCellHTML(row) + '</td>' +
+      '<td class="trade-cell">' + tradeCellHTML(row, 'flooring') + '</td>' +
+      '<td class="trade-cell">' + tradeCellHTML(row, 'cabinets') + '</td>' +
+      '<td class="trade-cell">' + tradeCellHTML(row, 'countertops') + '</td>' +
+      '<td class="trade-cell">' + tradeCellHTML(row, 'lights') + '</td>' +
+      '<td>' + (isAdmin ? '<button class="del-btn" data-id="' + esc(row.ID) + '" data-role="delete">Remove</button>' : '') + '</td>';
+    tbody.appendChild(tr);
+  });
+  attachHandlers();
+}
+
+function attachHandlers() {
+  document.querySelectorAll('[contenteditable="true"][data-field]').forEach(el => {
+    el.addEventListener('blur', onFieldBlur);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+  });
+  document.querySelectorAll('input[type="checkbox"][data-field]').forEach(el => {
+    el.addEventListener('change', onCheckboxChange);
+  });
+  // Approving is not a checkbox save — it opens the signature panel.
+  document.querySelectorAll('input[data-role="approve"]').forEach(el => {
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      openApproval(el.dataset.id, el.dataset.trade, el.checked);
+    });
+  });
+  document.querySelectorAll('[data-role="chat"]').forEach(el => {
+    el.addEventListener('click', () => openChat(el.dataset.id, el.dataset.trade));
+  });
+  document.querySelectorAll('[data-role="docs"]').forEach(el => {
+    el.addEventListener('click', () => openDocuments(el.dataset.id));
+  });
+  if (isAdmin) {
+    document.querySelectorAll('[data-role="delete"]').forEach(el => el.addEventListener('click', onDeleteRow));
+  }
+}
+
+/* ---------- approvals ---------- */
+function openApproval(rowId, trade, alreadyChecked) {
+  openThread = null;
+  openDocs = null;
+  // alreadyChecked is the checkbox's state BEFORE our preventDefault undid
+  // the click, so a ticked box means they are trying to remove approval.
+  openApprove = { id: String(rowId), trade: trade, revoking: !alreadyChecked, selDoc: null };
+  document.getElementById('chatOverlay').classList.add('open');
+  renderApproval();
+}
+function closeApproval() {
+  openApprove = null;
+  document.getElementById('chatOverlay').classList.remove('open');
+  renderRows();
+}
+function renderApproval() {
+  if (!openApprove) return;
+  const row = rows.find(r => String(r.ID) === openApprove.id);
+  const t = TRADES[openApprove.trade];
+  const revoking = openApprove.revoking;
+
+  document.getElementById('chatTitle').textContent =
+    (revoking ? 'Remove approval — ' : 'Approve — ') + t.label;
+  document.getElementById('chatSub').textContent =
+    row ? ((row.Project || '') + (row.Address ? ' · ' + row.Address : '')) : '';
+
+  const body = document.getElementById('chatBody');
+  const amount = row ? (row[t.amountField] || '') : '';
+
+  if (revoking) {
+    const sig = signatureFor(openApprove.id, openApprove.trade);
+    body.innerHTML =
+      '<div class="ap-warn">This removes the approval on record' +
+        (sig ? ' by <strong>' + esc(sig.by) + '</strong> from ' + esc(sig.tsLabel) : '') +
+        '. The original stays in the history — nothing is erased.</div>' +
+      '<p class="ap-label" style="margin-top:16px">Why is it being removed?</p>' +
+      '<textarea class="ap-note" id="apNote" placeholder="e.g. Scope changed — stair material revised"></textarea>' +
+      '<p class="ap-label" style="margin-top:14px">Your name</p>' +
+      '<input class="ap-name" id="apName" value="' + esc(myName()) + '" placeholder="Your name" />';
+  } else {
+    const docs = projectDocs(openApprove.id);
+    let docHTML;
+    if (!docs.length) {
+      docHTML = '<div class="ap-warn">There are no documents on this project yet. ' +
+                'An approval has to point at the document being approved, so upload it first.</div>';
+    } else {
+      docHTML = docs.map(d =>
+        '<label class="ap-doc' + (openApprove.selDoc === d.id ? ' sel' : '') + '" data-pick="' + esc(d.id) + '">' +
+          '<input type="radio" name="apDoc" value="' + esc(d.id) + '"' +
+            (openApprove.selDoc === d.id ? ' checked' : '') + ' />' +
+          '<span><span class="n">' + esc(d.fileName) + '</span>' +
+          '<span class="m">' + esc(d.by) + ' · ' + esc(d.role) + ' · ' + esc(d.tsLabel) + '</span>' +
+          '<a class="v" href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener">Open to check</a>' +
+          '</span>' +
+        '</label>'
+      ).join('');
+    }
+
+    body.innerHTML =
+      '<p class="ap-intro">Approving records your name, the date, and the exact document you approved. ' +
+      'That record is what settles it later if anyone asks what was agreed.</p>' +
+      (amount ? '<div class="ap-amount">Amount being approved<strong>' + esc(amount) + '</strong></div>' : '') +
+      '<p class="ap-label">Which document are you approving?</p>' + docHTML +
+      '<p class="ap-label" style="margin-top:16px">Your name</p>' +
+      '<input class="ap-name" id="apName" value="' + esc(myName()) + '" placeholder="Your name" />';
+
+    body.querySelectorAll('[data-pick]').forEach(el => {
+      el.addEventListener('click', function () {
+        openApprove.selDoc = el.dataset.pick;
+        renderApproval();
+      });
+    });
+  }
+  body.scrollTop = 0;
+
+  document.getElementById('chatFoot').innerHTML =
+    '<div class="chat-actions" style="margin-top:0">' +
+      '<span class="chat-as">Recorded as ' + esc(builderName) + '</span>' +
+      '<span class="chat-right">' +
+        '<button class="primary" id="apCancel" style="background:#eef0f4;color:#2f353c">Cancel</button>' +
+        '<button class="primary ' + (revoking ? 'revoke-go' : 'approve-go') + '" id="apGo">' +
+          (revoking ? 'Remove approval' : 'Approve this bid') + '</button>' +
+      '</span>' +
+    '</div>';
+  document.getElementById('apCancel').addEventListener('click', closeApproval);
+  document.getElementById('apGo').addEventListener('click', submitApproval);
+}
+
+async function submitApproval() {
+  if (!openApprove) return;
+  const revoking = openApprove.revoking;
+  const nameEl = document.getElementById('apName');
+  const name = (nameEl ? nameEl.value : '').trim();
+  if (!name) { setStatus('Enter your name before approving', 'error'); if (nameEl) nameEl.focus(); return; }
+  setMyName(name);
+
+  const noteEl = document.getElementById('apNote');
+  const note = noteEl ? noteEl.value.trim() : '';
+
+  if (!revoking && !openApprove.selDoc) {
+    setStatus('Choose which document you are approving', 'error');
+    return;
+  }
+  if (revoking && !note) {
+    setStatus('Say why the approval is being removed', 'error');
+    if (noteEl) noteEl.focus();
+    return;
+  }
+
+  const btn = document.getElementById('apGo');
+  btn.disabled = true;
+  setStatus(revoking ? 'Removing approval…' : 'Recording approval…', 'saving');
+  try {
+    await apiPost({
+      action: 'setApproval',
+      id: openApprove.id,
+      trade: openApprove.trade,
+      value: !revoking,
+      docId: revoking ? '' : openApprove.selDoc,
+      note: note,
+      author: name,
+      key: keyParam
+    });
+    await loadData();
+    closeApproval();
+    setStatus(revoking ? 'Approval removed' : 'Approved and signed ✓');
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'error');
+    const b = document.getElementById('apGo');
+    if (b) b.disabled = false;
+  }
+}
+
+/* ---------- documents ---------- */
+function openDocuments(rowId) {
+  openApprove = null;
+  openDocs = String(rowId);
+  pendingFile = null;
+  document.getElementById('chatOverlay').classList.add('open');
+  renderDocs();
+}
+function closeDocuments() {
+  openDocs = null;
+  docRotate = null;
+  pendingFile = null;
+  document.getElementById('chatOverlay').classList.remove('open');
+  renderRows();
+}
+function fmtSize(kb) {
+  if (!kb) return '';
+  return kb >= 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB';
+}
+function renderDocs() {
+  if (!openDocs) return;
+  const row = rows.find(r => String(r.ID) === openDocs);
+  document.getElementById('chatTitle').textContent = 'Documents';
+  document.getElementById('chatSub').textContent =
+    row ? ((row.Project || '') + (row.Address ? ' · ' + row.Address : '')) : '';
+
+  const list = projectDocs(openDocs);
+  const body = document.getElementById('chatBody');
+  if (!list.length) {
+    body.innerHTML = '<div class="chat-empty">No documents for this project yet.</div>';
+  } else {
+    body.innerHTML = list.map(d => {
+      const isPdf = /\.pdf$/i.test(d.fileName);
+      const open = docRotate && docRotate.id === d.id;
+      let actions = '';
+      if (canManageDoc(d)) {
+        actions = '<div class="doc-actions">' +
+          (isPdf ? '<button class="doc-rot" data-rotdoc="' + esc(d.id) + '">Rotate</button>' : '') +
+          '<button class="doc-del" data-doc="' + esc(d.id) + '">Remove</button></div>';
+      }
+      let bar = '';
+      if (open) {
+        bar = '<div class="doc-rotbar">' +
+          '<span class="msg">' + esc(docRotate.msg) + '</span>' +
+          '<span class="btns">' +
+            '<button class="turn" data-turn="-90"' + (docRotate.busy ? ' disabled' : '') + '>&#8634;</button>' +
+            '<button class="turn" data-turn="90"' + (docRotate.busy ? ' disabled' : '') + '>&#8635;</button>' +
+            '<button class="save" data-savert="1"' + (docRotate.busy || !docRotate.turned ? ' disabled' : '') + '>Save</button>' +
+            '<button class="cancel" data-cancelrt="1"' + (docRotate.busy ? ' disabled' : '') + '>Cancel</button>' +
+          '</span></div>';
+      }
+      return '<div class="doc-row" style="display:block">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
+          '<div class="doc-main">' +
+            '<a class="doc-name" href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener">&#128196; ' + esc(d.fileName) + '</a>' +
+            '<div class="doc-meta">' + esc(d.by) + ' · ' + esc(d.role) + ' · ' + esc(d.tsLabel) +
+              (d.sizeKB ? ' · ' + fmtSize(d.sizeKB) : '') + '</div>' +
+          '</div>' + actions +
+        '</div>' + bar + '</div>';
+    }).join('');
+    body.querySelectorAll('.doc-del').forEach(el => el.addEventListener('click', () => removeDocument(el.dataset.doc)));
+    body.querySelectorAll('.doc-rot').forEach(el => el.addEventListener('click', () => startDocRotate(el.dataset.rotdoc)));
+    body.querySelectorAll('[data-turn]').forEach(el => el.addEventListener('click', () => turnDoc(Number(el.dataset.turn))));
+    const saveBtn = body.querySelector('[data-savert]');
+    if (saveBtn) saveBtn.addEventListener('click', saveDocRotation);
+    const cancelBtn = body.querySelector('[data-cancelrt]');
+    if (cancelBtn) cancelBtn.addEventListener('click', function () { docRotate = null; renderDocs(); });
+  }
+  body.scrollTop = 0;
+  renderDocsFoot();
+}
+function renderDocsFoot() {
+  const foot = document.getElementById('chatFoot');
+  if (!canUploadDocs()) {
+    foot.innerHTML = '<div class="up-note">You can open or download anything listed here.</div>';
+    return;
+  }
+  foot.innerHTML =
+    '<div class="chat-actions" style="margin-top:0">' +
+      '<span class="chat-as">Plans, bids, diagrams, spec sheets — up to ' + MAX_FILE_MB + ' MB each</span>' +
+      '<span class="chat-right">' +
+        '<label class="attach-btn" for="docFile">&#128206; Choose file</label>' +
+        '<input type="file" id="docFile" style="display:none" />' +
+        '<button class="primary" id="docUpload">Upload</button>' +
+      '</span>' +
+    '</div>' +
+    '<div class="chat-attached" id="chatAttached"><span id="chatAttachedName"></span><span class="rm" id="chatAttachedRemove">Remove</span></div>';
+  document.getElementById('docFile').addEventListener('change', onFilePicked);
+  document.getElementById('docUpload').addEventListener('click', uploadDocument);
+  document.getElementById('chatAttachedRemove').addEventListener('click', () => { pendingFile = null; showAttached(); });
+  showAttached();
+}
+async function uploadDocument() {
+  if (!pendingFile) { setStatus('Choose a file first', 'error'); return; }
+  let name = myName();
+  if (!name) {
+    name = prompt('Your name (shown next to documents you add):', '');
+    if (!name || !name.trim()) return;
+    name = name.trim();
+    setMyName(name);
+  }
+  const target = openDocs;
+  const btn = document.getElementById('docUpload');
+  btn.disabled = true;
+  const mb = (pendingFile.data.length * 0.75 / 1024 / 1024).toFixed(1);
+  const label = pendingFile.name + ' (' + mb + ' MB)';
+  setStatus('Uploading ' + label + ' — starting…', 'saving');
+  pausePolling();
+  try {
+    await apiUpload({
+      action: 'postDocument',
+      id: target,
+      author: name,
+      key: keyParam,
+      fileName: pendingFile.name,
+      fileMime: pendingFile.mime,
+      fileData: pendingFile.data
+    }, function (s) {
+      setStatus('Uploading ' + label + ' — working, ' + s + 's… please leave this tab open', 'saving');
+    });
+    pendingFile = null;
+    await loadData();
+    if (openDocs) renderDocs();
+    renderRows();
+    setStatus('Document uploaded ✓');
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'error');
+  } finally {
+    resumePolling();
+    const b = document.getElementById('docUpload');
+    if (b) b.disabled = false;
+  }
+}
+/* Rotating a document that is already stored: pull it back, turn it in the
+   browser as many times as needed, then save once. */
+async function startDocRotate(docId) {
+  docRotate = { id: docId, busy: true, turned: 0, data: null, mime: '', msg: 'Fetching the file…' };
+  renderDocs();
+  pausePolling();
+  try {
+    const url = APPS_SCRIPT_URL + '?action=fetchDoc&key=' + encodeURIComponent(keyParam) +
+                '&docId=' + encodeURIComponent(docId) + '&_=' + Date.now();
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not fetch that document');
+    await ensurePdfLib();
+    docRotate.data = data.data;
+    docRotate.mime = data.mime || 'application/pdf';
+    docRotate.busy = false;
+    docRotate.msg = 'Turn it until it reads the right way, then Save';
+  } catch (err) {
+    docRotate = null;
+    setStatus('Error: ' + err.message, 'error');
+  } finally {
+    resumePolling();
+    renderDocs();
+  }
+}
+
+async function turnDoc(delta) {
+  if (!docRotate || docRotate.busy || !docRotate.data) return;
+  docRotate.busy = true;
+  docRotate.msg = 'Turning…';
+  renderDocs();
+  try {
+    const doc = await PDFLib.PDFDocument.load(b64ToBytes(docRotate.data), { ignoreEncryption: true });
+    doc.getPages().forEach(function (p) {
+      const cur = (p.getRotation() && p.getRotation().angle) || 0;
+      p.setRotation(PDFLib.degrees((cur + delta + 360) % 360));
+    });
+    const out = await doc.save();
+    docRotate.data = bytesToB64(out);
+    docRotate.turned = ((docRotate.turned + delta) + 360) % 360;
+    docRotate.msg = 'Turned ' + docRotate.turned + '° — Save to keep it';
+  } catch (err) {
+    docRotate.msg = 'Could not turn that file';
+  } finally {
+    docRotate.busy = false;
+    renderDocs();
+  }
+}
+
+async function saveDocRotation() {
+  if (!docRotate || !docRotate.data || !docRotate.turned) return;
+  const target = docRotate.id;
+  docRotate.busy = true;
+  docRotate.msg = 'Saving…';
+  renderDocs();
+  pausePolling();
+  try {
+    await apiUpload({
+      action: 'replaceDocument',
+      docId: target,
+      key: keyParam,
+      fileMime: docRotate.mime,
+      fileData: docRotate.data
+    }, function (s) {
+      setStatus('Saving the rotated document — working, ' + s + 's… please leave this tab open', 'saving');
+    });
+    docRotate = null;
+    await loadData();
+    if (openDocs) renderDocs();
+    renderRows();
+    setStatus('Document rotated and saved ✓');
+  } catch (err) {
+    if (docRotate) { docRotate.busy = false; docRotate.msg = 'Save failed'; renderDocs(); }
+    setStatus('Error: ' + err.message, 'error');
+  } finally {
+    resumePolling();
+  }
+}
+
+async function removeDocument(docId) {
+  if (!confirm('Remove this document from the list? The file itself stays in your Google Drive.')) return;
+  setStatus('Removing…', 'saving');
+  try {
+    await apiPost({ action: 'deleteDocument', docId: docId, key: keyParam });
+    await loadData();
+    if (openDocs) renderDocs();
+    renderRows();
+    setStatus('Removed');
+  } catch (err) { setStatus('Error: ' + err.message, 'error'); }
+}
+
+/* ---------- chat ---------- */
+function openChat(rowId, trade) {
+  openDocs = null;
+  openApprove = null;
+  openThread = { id: String(rowId), trade: trade };
+  pendingFile = null;
+  document.getElementById('chatOverlay').classList.add('open');
+  renderChat();
+  markSeen(rowId, trade);
+  renderRows();
+}
+function closeChat() {
+  if (openThread) markSeen(openThread.id, openThread.trade);
+  openThread = null;
+  pendingFile = null;
+  document.getElementById('chatOverlay').classList.remove('open');
+  renderRows();
+}
+function renderChat() { renderChatMessages(); renderChatFoot(); }
+
+// Message list only — safe to call on every background refresh.
+function renderChatMessages() {
+  if (!openThread) return;
+  const row = rows.find(r => String(r.ID) === openThread.id);
+  const t = TRADES[openThread.trade];
+  document.getElementById('chatTitle').textContent = t.label;
+  document.getElementById('chatSub').textContent =
+    row ? ((row.Project || '') + (row.Address ? ' · ' + row.Address : '')) : '';
+
+  const list = threadMessages(openThread.id, openThread.trade);
+  const body = document.getElementById('chatBody');
+  if (!list.length) {
+    body.innerHTML = '<div class="chat-empty">No messages yet. Start the conversation below.</div>';
+  } else {
+    const me = myName();
+    body.innerHTML = list.map(m => {
+      const mine = me && m.author === me;
+      let html = '<div class="msg' + (mine ? ' mine' : '') + '">' +
+        '<div class="msg-meta"><span class="who">' + esc(m.author) + '</span> · ' +
+        '<span class="role">' + esc(m.role) + '</span> · ' + esc(m.tsLabel || m.ts) + '</div>';
+      if (m.text) html += '<div class="msg-text">' + esc(m.text) + '</div>';
+      if (m.fileUrl) {
+        html += '<div><a class="msg-file" href="' + esc(m.fileUrl) + '" target="_blank" rel="noopener">' +
+                '<span>&#128206;</span><span class="fn">' + esc(m.fileName || 'Attachment') + '</span></a></div>';
+      }
+      return html + '</div>';
+    }).join('');
+  }
+  body.scrollTop = body.scrollHeight;
+}
+
+// Compose box — rebuilt only on open or name change, never by a refresh.
+function renderChatFoot() {
+  if (!openThread) return;
+  const foot = document.getElementById('chatFoot');
+  if (!canSeeThread(openThread.trade)) { foot.innerHTML = ''; return; }
+  const draft = (document.getElementById('chatInput') || {}).value || '';
+  const me = myName();
+  foot.innerHTML =
+    '<textarea id="chatInput" placeholder="Write a message…"></textarea>' +
+    '<div class="chat-actions">' +
+      '<span class="chat-as">' + (me ? 'Posting as <strong>' + esc(me) + '</strong> · <a id="chatRename">change</a>' : 'You will be asked your name') + '</span>' +
+      '<span class="chat-right">' +
+        (canAttach()
+          ? '<label class="attach-btn" for="chatFile">&#128206; Attach</label>' +
+            '<input type="file" id="chatFile" style="display:none" />'
+          : '') +
+        '<button class="primary" id="chatSend">Send</button>' +
+      '</span>' +
+    '</div>' +
+    '<div class="chat-attached" id="chatAttached"><span id="chatAttachedName"></span><span class="rm" id="chatAttachedRemove">Remove</span></div>';
+
+  const input = document.getElementById('chatInput');
+  input.value = draft;
+  document.getElementById('chatSend').addEventListener('click', sendMessage);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendMessage(); }
+  });
+  const rn = document.getElementById('chatRename');
+  if (rn) rn.addEventListener('click', () => {
+    const n = prompt('Your name (shown on your messages):', myName());
+    if (n && n.trim()) { setMyName(n.trim()); renderChatFoot(); renderChatMessages(); }
+  });
+  const fi = document.getElementById('chatFile');
+  if (fi) fi.addEventListener('change', onFilePicked);
+  const rm = document.getElementById('chatAttachedRemove');
+  if (rm) rm.addEventListener('click', () => { pendingFile = null; showAttached(); });
+  showAttached();
+}
+
+function showAttached() {
+  const box = document.getElementById('chatAttached');
+  if (!box) return;
+  if (!pendingFile) { box.classList.remove('show'); return; }
+
+  const isPdf = /\.pdf$/i.test(pendingFile.name);
+  const rot = pendingFile.rotated || 0;
+  const nameEl = document.getElementById('chatAttachedName');
+  nameEl.textContent = '📎 ' + pendingFile.name + (rot ? '  (rotated ' + rot + '°)' : '');
+
+  // Offer rotation only for PDFs — some selection sheets are generated sideways.
+  let tools = box.querySelector('.rot-tools');
+  if (isPdf && !tools) {
+    tools = document.createElement('span');
+    tools.className = 'rot-tools';
+    tools.innerHTML = '<button class="rot-btn" data-rot="-90" title="Rotate left">&#8634;</button>' +
+                      '<button class="rot-btn" data-rot="90" title="Rotate right">&#8635;</button>';
+    box.insertBefore(tools, box.querySelector('.rm'));
+    tools.querySelectorAll('.rot-btn').forEach(function (b) {
+      b.addEventListener('click', function () { rotatePendingPdf(Number(b.dataset.rot)); });
+    });
+  } else if (!isPdf && tools) {
+    tools.remove();
+  }
+  box.classList.add('show');
+}
+
+// pdf-lib, fetched only the first time someone actually rotates something.
+let pdfLibPromise = null;
+function ensurePdfLib() {
+  if (window.PDFLib) return Promise.resolve();
+  if (!pdfLibPromise) {
+    pdfLibPromise = new Promise(function (resolve, reject) {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+      s.onload = resolve;
+      s.onerror = function () { pdfLibPromise = null; reject(new Error('Could not load the rotation tool')); };
+      document.head.appendChild(s);
+    });
+  }
+  return pdfLibPromise;
+}
+
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function bytesToB64(bytes) {
+  let bin = '';
+  const step = 0x8000;
+  for (let i = 0; i < bytes.length; i += step) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+  }
+  return btoa(bin);
+}
+
+async function rotatePendingPdf(delta) {
+  if (!pendingFile || !/\.pdf$/i.test(pendingFile.name)) return;
+  const btns = document.querySelectorAll('.rot-btn');
+  btns.forEach(function (b) { b.disabled = true; });
+  setStatus('Rotating ' + pendingFile.name + '…', 'saving');
+  try {
+    await ensurePdfLib();
+    const doc = await PDFLib.PDFDocument.load(b64ToBytes(pendingFile.data), { ignoreEncryption: true });
+    doc.getPages().forEach(function (p) {
+      const cur = (p.getRotation() && p.getRotation().angle) || 0;
+      p.setRotation(PDFLib.degrees((cur + delta + 360) % 360));
+    });
+    const out = await doc.save();
+    pendingFile.data = bytesToB64(out);
+    pendingFile.rotated = ((pendingFile.rotated || 0) + delta + 360) % 360;
+    showAttached();
+    setStatus('Rotated ' + pendingFile.rotated + '° — upload when it looks right');
+  } catch (err) {
+    setStatus('Could not rotate: ' + err.message, 'error');
+  } finally {
+    document.querySelectorAll('.rot-btn').forEach(function (b) { b.disabled = false; });
+  }
+}
+
+function onFilePicked(e) {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  if (f.size > MAX_FILE_MB * 1024 * 1024) {
+    setStatus('That file is over ' + MAX_FILE_MB + ' MB — too large to attach', 'error');
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function () {
+    const res = String(reader.result);
+    pendingFile = {
+      name: f.name,
+      mime: f.type || 'application/octet-stream',
+      data: res.substring(res.indexOf(',') + 1)
+    };
+    showAttached();
+    // Never leave the action button stuck disabled from an earlier attempt.
+    ['docUpload', 'chatSend'].forEach(function (id) {
+      const b = document.getElementById(id);
+      if (b) b.disabled = false;
+    });
+    const sizeMB = (f.size / 1024 / 1024).toFixed(1);
+    setStatus('Attached ' + f.name + ' (' + sizeMB + ' MB) — press ' +
+              (document.getElementById('docUpload') ? 'Upload' : 'Send') + ' to post it');
+  };
+  reader.readAsDataURL(f);
+  e.target.value = '';
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text && !pendingFile) return;
+  let name = myName();
+  if (!name) {
+    name = prompt('Your name (shown on your messages):', '');
+    if (!name || !name.trim()) return;
+    name = name.trim();
+    setMyName(name);
+  }
+  // Hold onto the thread — if the panel gets closed while the send is still in
+  // flight, we still need to mark it read afterwards.
+  const sentTo = { id: openThread.id, trade: openThread.trade };
+  const btn = document.getElementById('chatSend');
+  btn.disabled = true;
+  setStatus(pendingFile ? 'Uploading — large files can take a minute…' : 'Sending…', 'saving');
+  if (pendingFile) pausePolling();
+  try {
+    const payload = {
+      action: 'postMessage',
+      id: sentTo.id,
+      thread: sentTo.trade,
+      text: text,
+      author: name,
+      trade: tradeParam,
+      key: keyParam
+    };
+    if (pendingFile) {
+      payload.fileName = pendingFile.name;
+      payload.fileMime = pendingFile.mime;
+      payload.fileData = pendingFile.data;
+      const fname = pendingFile.name;
+      const fmb = (pendingFile.data.length * 0.75 / 1024 / 1024).toFixed(1);
+      await apiUpload(payload, function (s) {
+        setStatus('Uploading ' + fname + ' (' + fmb + ' MB) — working, ' + s + 's… please leave this tab open', 'saving');
+      });
+    } else {
+      await apiPost(payload);
+    }
+    input.value = '';
+    pendingFile = null;
+    showAttached();
+    await loadData();
+    markSeen(sentTo.id, sentTo.trade);
+    if (openThread) renderChatMessages();
+    renderRows();
+    setStatus('Message sent ✓');
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'error');
+  } finally {
+    resumePolling();
+    const b = document.getElementById('chatSend');
+    if (b) b.disabled = false;
+  }
+}
+
+/* ---------- field saving ---------- */
+async function onFieldBlur(e) {
+  const el = e.target;
+  const row = rows.find(r => String(r.ID) === String(el.dataset.id));
+  const value = el.textContent.trim();
+  if (row && String(row[el.dataset.field] || '') === value) return;
+  await saveField(el.dataset.id, el.dataset.field, value);
+}
+async function onCheckboxChange(e) {
+  await saveField(e.target.dataset.id, e.target.dataset.field, e.target.checked);
+}
+async function onDeleteRow(e) {
+  const id = e.target.dataset.id;
+  if (!confirm('Remove this project from the tracker? Its messages, documents and approval history go with it.')) return;
+  setStatus('Deleting…', 'saving');
+  try { await apiPost({ action: 'deleteRow', id: id, key: keyParam }); await loadData(); setStatus('Removed'); }
+  catch (err) { setStatus('Error: ' + err.message, 'error'); }
+}
+async function saveField(id, field, value) {
+  setStatus('Saving…', 'saving');
+  try {
+    await apiPost({ action: 'update', id: id, field: field, value: value, trade: tradeParam, key: keyParam });
+    const row = rows.find(r => String(r.ID) === String(id));
+    if (row) row[field] = value;
+    setStatus('Saved ✓');
+    renderRows();
+  } catch (err) { setStatus('Error: ' + err.message, 'error'); }
+}
+
+/* ---------- load ---------- */
+async function loadData() {
+  try {
+    rows = await apiGet();
+    setRoleBadge();
+    document.getElementById('addProjectBtn').style.display = isAdmin ? 'inline-block' : 'none';
+    renderRows();
+    if (openThread) renderChatMessages();
+    setStatus('Live — last synced ' + new Date().toLocaleTimeString());
+    // note: the documents and approval panels are redrawn explicitly after an
+    // action, not on every poll, so a refresh never yanks what you just picked
+  } catch (err) {
+    setStatus('Error loading data: ' + err.message, 'error');
+  }
+}
+
+document.getElementById('addProjectBtn').addEventListener('click', async () => {
+  const project = prompt('Project name:');
+  if (!project) return;
+  const address = prompt('Address:') || '';
+  const released = prompt('Released date (e.g. 7/28/26):') || '';
+  const dueDate = prompt('Due date:') || '';
+  setStatus('Adding project…', 'saving');
+  try { await apiPost({ action: 'addRow', project, address, released, dueDate, key: keyParam }); await loadData(); setStatus('Project added ✓'); }
+  catch (err) { setStatus('Error: ' + err.message, 'error'); }
+});
+
+function closePanel() {
+  if (openApprove) closeApproval();
+  else if (openDocs) closeDocuments();
+  else closeChat();
+}
+document.getElementById('chatClose').addEventListener('click', closePanel);
+document.getElementById('chatOverlay').addEventListener('click', e => {
+  if (e.target.id === 'chatOverlay') closePanel();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && (openThread || openDocs || openApprove)) closePanel();
+});
+
+function init() {
+  setRoleBadge();
+  loadData();
+  pollTimer = setInterval(loadData, 15000);
+}
+init();
+</script>
+</body>
+</html>
