@@ -26,8 +26,19 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     background: var(--gray-bg);
     color: var(--text);
+    /* Full-height column: the bar, the toolbar and the footer keep their size and
+       the table pane takes whatever is left. That makes the table the thing that
+       scrolls, which is what pins the column headers on screen. Fixed height, not
+       min-height -- with min-height the body just grows to fit the table and the
+       PAGE scrolls, which is the bug this is fixing. */
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
   header {
+    flex: 0 0 auto;
     background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
     color: white;
     padding: 22px 32px;
@@ -48,6 +59,7 @@
     font-weight: 500;
   }
   .toolbar {
+    flex: 0 0 auto;
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 32px; flex-wrap: wrap; gap: 10px;
   }
@@ -61,12 +73,19 @@
   button.primary:hover { background: var(--navy-light); }
   button.primary:disabled { opacity: 0.5; cursor: default; }
   .table-wrap {
-    margin: 0 32px 40px; background: white; border-radius: 10px;
+    /* This box fills the leftover height and scrolls inside itself, which is what
+       keeps the column headers on screen. An explicit min-height overrides a flex
+       item's default min-height:auto -- without that it refuses to shrink below
+       its content and the whole page scrolls instead, header and all. */
+    flex: 1 1 auto;
+    min-height: 180px;
+    margin: 0 32px 16px; background: white; border-radius: 10px;
     border: 1px solid var(--border); overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
   table { border-collapse: collapse; width: 100%; min-width: 1120px; font-size: 13.5px; }
   thead th {
     position: sticky; top: 0; background: var(--navy); color: white; text-align: left;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.15);
     padding: 12px 14px; font-weight: 600; font-size: 12.5px; text-transform: uppercase;
     letter-spacing: 0.4px; white-space: nowrap; z-index: 2;
   }
@@ -184,7 +203,7 @@
   .doc-rotbar button:disabled { opacity: 0.5; cursor: default; }
   .up-note { font-size: 11.5px; color: var(--text-muted); }
   .del-btn { background: none; border: none; color: var(--red); cursor: pointer; font-size: 12px; padding: 4px 6px; }
-  footer { text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px; }
+  footer { flex: 0 0 auto; text-align: center; color: var(--text-muted); font-size: 12px; padding: 14px 20px; }
   .empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted); }
 
   .overlay {
